@@ -16,31 +16,37 @@ node {
 
   def id = "${env.JOB_NAME}-${env.BUILD_ID}"
   def td = "/tmp/${id}"
-  def tv = "${TF_VERSION}"
   def wd = "${pwd()}/${GIT_SUBDIR}"
-
-  def dkra  = "${DK_RUN_ARGS}"
-  def tfca = "${TF_CMD_ARGS}"
   def tfra = "${TF_REMOTE_ARGS}"
 
-  git credentialsId: "${GIT_CREDS}", url: "${GIT_URL}"
+  def tv = tfVersion("light")
+  def dkra  = dkRunArgs("")
+  def tfca = tfCmdArgs("")
+  def tfcs = tfCmdSargs("")
 
+  git credentialsId: "${GIT_CREDS}", url: "${GIT_URL}"
   withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: AWS_CREDS, usernameVariable: 'ak', passwordVariable: 'sk']]) {
 
-    def run = "docker run --rm -u `id -u jenkins` -v ${wd}:${td} -w=${td} -e AWS_ACCESS_KEY_ID=${env.ak} -e AWS_SECRET_ACCESS_KEY=${env.sk} ${dkra} hashicorp/terraform:${tv}"
+    def run = "docker run --rm -u `id -u \044USER` -v ${wd}:${td} -w=${td} -e AWS_ACCESS_KEY_ID=${env.ak} -e AWS_SECRET_ACCESS_KEY=${env.sk} ${dkra} hashicorp/terraform:${tv}"
     def args = "-var aws_access_key=${env.ak} -var aws_secret_key=${env.sk} ${tfca}"
+    sh "(head -n20 ${wd}/.terraform/terraform.tfstate 2>/dev/null | grep -q remote) || ${run} remote config ${tfra}" 
 
-    withCredentials([[$class: 'StringBinding', credentialsId: TF_CMD_SARGS, variable: 'tfcs']]) {
-
-      sh "(head -n20 ${wd}/.terraform/terraform.tfstate 2>/dev/null | grep -q remote) || ${run} remote config ${tfra}"
-      args = "${args} ${env.tfcs}"
-      
-      stage 'Plan'    
-      sh "${run} plan ${args}"
-      input 'Apply the plan?'
-      
-      stage 'Apply'
-      sh "${run} apply ${args}"
+    if (tfcs.trim()) {
+      withCredentials([[$class: 'StringBinding', credentialsId: TF_CMD_SARGS, variable: 'tfcs']]) {
+        args = "${args} ${env.tfcs}"
+      }
     }
+
+    stage 'Plan'
+    sh "${run} plan ${args}"
+
+    input 'Apply the plan?'
+    stage 'Apply'
+    sh "${run} apply ${args}"
   }
 }
+
+def dkRunArgs(val) { try { return "$DK_RUN_ARGS" } catch (MissingPropertyException e) { return val } }
+def tfCmdArgs(val) { try { return "$TF_CMD_ARGS" } catch (MissingPropertyException e) { return val } }
+def tfCmdSargs(val) { try { return "$TF_CMD_SARGS" } catch (MissingPropertyException e) { return val } }
+def tfVersion(val) { try { return "$TF_VERSION" } catch (MissingPropertyException e) { return val } }
