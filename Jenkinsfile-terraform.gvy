@@ -32,7 +32,7 @@ node {
 
     def run = "docker run --rm -u `id -u \044USER` -v ${wd}:${td} -w=${td} -e AWS_ACCESS_KEY_ID=${env.ak} -e AWS_SECRET_ACCESS_KEY=${env.sk} ${dkra}"
     def args = "-var aws_access_key=${env.ak} -var aws_secret_key=${env.sk} ${tfca}"
-    sh "(head -n20 ${wd}/.terraform/terraform.tfstate 2>/dev/null | grep -q remote) || ${run} remote config ${tfra}" 
+    sh "(head -n20 ${wd}/.terraform/terraform.tfstate 2>/dev/null | grep -q remote) || ${run} ${tfDockerImage(tv)} remote config ${tfra}" 
 
     if (tfcs.trim()) {
       withCredentials([[$class: 'StringBinding', credentialsId: TF_CMD_SARGS, variable: 'tfcs']]) {
@@ -55,13 +55,15 @@ node {
 }
 
 def tfExec(tv, run, args) {
-  run = "${run} hashicorp/terraform:${tv}"
+  run = "${run} ${tfDockerImage(tv)}"
   stage 'Plan'
   sh "${run} plan ${args}"
   input 'Apply the plan?'
   stage 'Apply'
   sh "${run} apply ${args}"
 }
+
+def tfDockerImage(tv) { return "hashicorp/terraform:${tv}" }
 
 def dkRunArgs(val) { try { return "$DK_RUN_ARGS" } catch (MissingPropertyException e) { return val } }
 def tfCmdArgs(val) { try { return "$TF_CMD_ARGS" } catch (MissingPropertyException e) { return val } }
