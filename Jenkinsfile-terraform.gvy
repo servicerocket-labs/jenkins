@@ -37,10 +37,10 @@ node {
     if (tfcs.trim()) {
       withCredentials([[$class: 'StringBinding', credentialsId: TF_CMD_SARGS, variable: 'tfcs']]) {
         args = "${args} ${env.tfcs}"
-        tfExecTfvars(tv, run, args, tfv);
+        tfExecTfvars(tv, run, args, td, tfv);
       }
     } else {
-      tfExecTfvars(tv, run, args, tfv);
+      tfExecTfvars(tv, run, args, td, tfv);
     }
   }
 }
@@ -54,7 +54,7 @@ def tfExec(tv, run, args) {
   sh "${run} apply ${args}"
 }
 
-def tfExecTfvars(tv, run, args, tfv) {
+def tfExecTfvars(tv, run, args, td, tfv) {
   if (tfv.trim()) {
     withCredentials([[$class: 'FileBinding', credentialsId: TF_VARS, variable: 'tfv']]) {
       run = "${run} -v ${env.tfv}:${td}/terraform.tfvars"
