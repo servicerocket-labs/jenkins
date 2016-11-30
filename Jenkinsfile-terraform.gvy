@@ -37,19 +37,10 @@ node {
     if (tfcs.trim()) {
       withCredentials([[$class: 'StringBinding', credentialsId: TF_CMD_SARGS, variable: 'tfcs']]) {
         args = "${args} ${env.tfcs}"
-      }
-    }
-
-    filez = ""
-
-    if (tfv.trim()) {
-      withCredentials([[$class: 'FileBinding', credentialsId: TF_VARS, variable: 'tfv']]) {
-        run = "${run} -v ${env.tfv}:${td}/terraform.tfvars"
-        args = "${args} -var-file=${td}/terraform.tfvars"
-        tfExec(tv, run, args)
+        tfExecTfvars(tv, run, args, tfv);
       }
     } else {
-      tfExec(tv, run, args)
+      tfExecTfvars(tv, run, args, tfv);
     }
   }
 }
@@ -61,6 +52,18 @@ def tfExec(tv, run, args) {
   input 'Apply the plan?'
   stage 'Apply'
   sh "${run} apply ${args}"
+}
+
+def tfExecTfvars(tv, run, args, tfv) {
+  if (tfv.trim()) {
+    withCredentials([[$class: 'FileBinding', credentialsId: TF_VARS, variable: 'tfv']]) {
+      run = "${run} -v ${env.tfv}:${td}/terraform.tfvars"
+      args = "${args} -var-file=${td}/terraform.tfvars"
+      tfExec(tv, run, args)
+    }
+  } else {
+    tfExec(tv, run, args)
+  }
 }
 
 def tfDockerImage(tv) { return "hashicorp/terraform:${tv}" }
