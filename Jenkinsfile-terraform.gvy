@@ -1,11 +1,11 @@
 // Reusable Jenkinsfile for Terraform projects. An Atlas replacement, needs AWS.
-// 
+//
 // # Vars:
 // - AWS_CREDS: AWS access key ID and secret access key.
 // - DK_RUN_ARGS: Additional arguments for Docker, e.g. "-e FOO=bar".
 // - GIT_CREDS: SSH username with private key.
-// - GIT_URL: 
-// - GIT_SUBDIR: 
+// - GIT_URL:
+// - GIT_SUBDIR:
 // - TF_REMOTE_ARGS: Arguments to configure Terraform remote state, e.g. "-backend=s3 -backend-config=...".
 //
 // # Optional Vars
@@ -19,10 +19,8 @@ node {
   def id = "${env.JOB_NAME}-${env.BUILD_ID}"
   def td = "/tmp/${id}"
   def wd = "${pwd()}/${GIT_SUBDIR}"
-  def tfra = "${TF_REMOTE_ARGS}"
 
   def tv = tfVersion("light")
-  def dkra  = dkRunArgs("")
   def tfca = tfCmdArgs("")
   def tfcs = tfCmdSargs("")
   def tfv = tfVars("")
@@ -30,9 +28,9 @@ node {
   git credentialsId: "${GIT_CREDS}", url: "${GIT_URL}"
   withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: AWS_CREDS, usernameVariable: 'ak', passwordVariable: 'sk']]) {
 
-    def run = "docker run --rm -u `id -u \044USER` -v ${wd}:${td} -w=${td} -e AWS_ACCESS_KEY_ID=${env.ak} -e AWS_SECRET_ACCESS_KEY=${env.sk} ${dkra}"
-    def args = "-var aws_access_key=${env.ak} -var aws_secret_key=${env.sk} ${tfca}"
-    sh "(head -n20 ${wd}/.terraform/terraform.tfstate 2>/dev/null | grep -q remote) || ${run} ${tfDockerImage(tv)} remote config ${tfra}" 
+    def run = "docker run --rm -v ${wd}:${td} -w=${td} -e AWS_ACCESS_KEY_ID=${env.ak} -e AWS_SECRET_ACCESS_KEY=${env.sk}"
+    def args = "-var aws_access_key=${env.ak} -var aws_secret_key=${env.sk}"
+    sh "${run} ${tfDockerImage(tv)} init -force-copy"
 
     if (tfcs.trim()) {
       withCredentials([[$class: 'StringBinding', credentialsId: TF_CMD_SARGS, variable: 'tfcs']]) {
@@ -48,10 +46,10 @@ node {
 def tfExec(tv, run, args) {
   run = "${run} ${tfDockerImage(tv)}"
   stage 'Plan'
-  sh "${run} plan ${args}"
+  sh "${run} plan ${args} -refresh=false"
   input 'Apply the plan?'
   stage 'Apply'
-  sh "${run} apply ${args}"
+  sh "${run} apply ${args} -refresh=false"
 }
 
 def tfExecTfvars(tv, run, args, td, tfv) {
@@ -68,7 +66,7 @@ def tfExecTfvars(tv, run, args, td, tfv) {
 
 def tfDockerImage(tv) { return "hashicorp/terraform:${tv}" }
 
-def dkRunArgs(val) { try { return "$DK_RUN_ARGS" } catch (MissingPropertyException e) { return val } }
+
 def tfCmdArgs(val) { try { return "$TF_CMD_ARGS" } catch (MissingPropertyException e) { return val } }
 def tfCmdSargs(val) { try { return "$TF_CMD_SARGS" } catch (MissingPropertyException e) { return val } }
 def tfVars(val) { try { return "$TF_VARS" } catch(MissingPropertyException e) { return val } }
